@@ -14,6 +14,8 @@ dependencies = [
 
 [project.optional-dependencies]
 postgres = ["psycopg[binary]>=3.2"]
+rag = ["langchain-core>=1.0", "langchain-ollama>=1.0"]
+mlflow = ["mlflow>=3.0"]
 dev = ["pytest>=8.3", "ruff>=0.7"]
 
 [project.scripts]

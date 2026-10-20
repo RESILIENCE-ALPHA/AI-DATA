@@ -33,8 +33,10 @@ class Config:
 
     rag_enabled: bool = False
     ollama_url: str = "http://ollama.ia.svc.cluster.local:11434"
-    rag_model: str = "llama3.1:8b"
+    rag_model: str = "mistral:7b"
     rag_timeout_s: float = 9.0
+    rag_docs_dir: str = "runbooks"
+    rag_embed_model: str = "nomic-embed-text"
 
     @classmethod
     def from_env(cls) -> Config:
@@ -58,6 +60,8 @@ class Config:
             replay=e.get("REPLAY", "").lower() in ("1", "true", "yes"),
             rag_enabled=e.get("RAG_ENABLED", "").lower() in ("1", "true", "yes"),
             ollama_url=e.get("OLLAMA_URL", "http://ollama.ia.svc.cluster.local:11434"),
-            rag_model=e.get("RAG_MODEL", "llama3.1:8b"),
+            rag_model=e.get("RAG_MODEL", "mistral:7b"),
             rag_timeout_s=float(e.get("RAG_TIMEOUT_S", "9")),
+            rag_docs_dir=e.get("RAG_DOCS_DIR", "runbooks"),
+            rag_embed_model=e.get("RAG_EMBED_MODEL", "nomic-embed-text"),
         )

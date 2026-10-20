@@ -7,3 +7,8 @@ httpx>=0.27,<1
 PyYAML>=6.0,<7
 # Live Postgres source (optional, install with: uv pip install "psycopg[binary]")
 psycopg[binary]>=3.2,<4
+# RAG step: LangChain + Ollama (Mistral 7B)
+langchain-core>=1.0,<2
+langchain-ollama>=1.0,<2
+# Training only: experiment tracking and model registry
+mlflow>=3.0,<4

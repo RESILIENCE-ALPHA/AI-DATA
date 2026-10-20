@@ -1,4 +1,4 @@
-.PHONY: setup lint test data features train evaluate replay run-local clean
+.PHONY: setup lint test data features train evaluate replay run-local mlflow-ui clean
 
 VENV ?= .venv
 PY := $(VENV)/bin/python
@@ -8,7 +8,7 @@ export PYTHONPATH := src
 
 setup:
 	uv venv $(VENV)
-	$(PIP) install --python $(PY) -e ".[dev,postgres]"
+	$(PIP) install --python $(PY) -e ".[dev,postgres,rag,mlflow]"
 
 lint:
 	$(VENV)/bin/ruff check src tests
@@ -39,8 +39,12 @@ replay:
 	SOURCE=file SOURCE_FILES=data/raw/synth_bf_v1/auth.jsonl SINK=stdout \
 	REPLAY=1 $(PY) -m detector
 
+# Browse MLflow runs, metrics and the model registry on http://127.0.0.1:5000
+mlflow-ui:
+	$(VENV)/bin/mlflow ui --backend-store-uri sqlite:///mlflow.db --port 5000
+
 run-local:
 	SOURCE=file SINK=stdout $(PY) -m detector
 
 clean:
-	rm -rf data models reports .pytest_cache .ruff_cache
+	rm -rf data models reports mlruns mlartifacts mlflow.db .pytest_cache .ruff_cache

@@ -44,9 +44,11 @@ class Service:
     def _build_rag(self):
         if not self.config.rag_enabled:
             return None
-        from .rag import RagClient
+        from .rag import RagAdvisor
 
-        return RagClient(self.config.ollama_url, self.config.rag_model, self.config.rag_timeout_s)
+        c = self.config
+        return RagAdvisor.from_config(c.ollama_url, c.rag_model, c.rag_timeout_s,
+                                      docs_dir=c.rag_docs_dir, embed_model=c.rag_embed_model)
 
     def load_models(self) -> None:
         for name in self.config.enabled_detectors:

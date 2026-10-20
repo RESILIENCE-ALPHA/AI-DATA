@@ -22,6 +22,7 @@ import yaml
 from detector.config import Config
 from detector.schema import _parse_ts
 from detector.service import Service
+from training import tracking
 
 EVAL_DATASETS = ("synth_bf_v1", "synth_hard_v1")
 
@@ -52,7 +53,10 @@ def _capture_hours(auth_file: Path) -> float:
     return max((last - first) / 3600.0, 1e-6)
 
 
-def evaluate(params: dict, raw: Path, features: Path, models: Path, reports: Path) -> dict:
+def evaluate(
+    params: dict, raw: Path, features: Path, models: Path, reports: Path,
+    tracking_uri: str | None = None, use_mlflow: bool = True,
+) -> dict:
     detector = params["model"]["detector"]
     version = params["model"]["version"]
 
@@ -115,7 +119,40 @@ def evaluate(params: dict, raw: Path, features: Path, models: Path, reports: Pat
     (out_dir / "eval.json").write_text(json.dumps(report, indent=2))
     (out_dir / "eval.md").write_text(_markdown(report))
     print(json.dumps(report, indent=2))
+    if use_mlflow:
+        _log_to_mlflow(report, models / detector / version, out_dir, tracking_uri)
     return report
+
+
+def _log_to_mlflow(report: dict, model_dir: Path, out_dir: Path, tracking_uri: str | None) -> None:
+    """Add the evaluation to the training run; promote the model if the gate passes.
+
+    Promotion = the MLflow registry alias `production` points at this model version,
+    so the registry always shows which version passed the gate last.
+    """
+    metadata = json.loads((model_dir / "metadata.json").read_text())
+    run_id = metadata.get("mlflow_run_id")
+    if not run_id:
+        print("mlflow: no run id in metadata (trained with --no-mlflow), skipping")
+        return
+    detector = metadata["detector"]
+    mlflow = tracking.setup(detector, tracking_uri)
+    with mlflow.start_run(run_id=run_id):
+        mlflow.log_metrics({
+            "eval_bruteforce_detected": float(report["bruteforce_detected"]),
+            "eval_max_detection_delay_s": float(report["max_detection_delay_s_replay"] or -1),
+            "eval_false_positive_events": float(report["false_positive_events"]),
+            "eval_fp_per_hour": float(report["fp_per_hour"] or 0.0),
+            "eval_gate_pass": float(report["gate_pass"]),
+        })
+        mlflow.log_artifacts(str(out_dir), artifact_path="eval_report")
+        mlflow.set_tag("gate", "pass" if report["gate_pass"] else "fail")
+    version = metadata.get("mlflow_model_version")
+    if report["gate_pass"] and version:
+        from mlflow import MlflowClient
+
+        MlflowClient().set_registered_model_alias(detector, tracking.PRODUCTION_ALIAS, version)
+        print(f"mlflow: {detector} version {version} -> alias '{tracking.PRODUCTION_ALIAS}'")
 
 
 def _markdown(r: dict) -> str:
@@ -144,9 +181,11 @@ def main() -> None:
     ap.add_argument("--features", default="data/features")
     ap.add_argument("--models", default="models")
     ap.add_argument("--reports", default="reports")
+    ap.add_argument("--no-mlflow", action="store_true", help="skip MLflow logging")
     args = ap.parse_args()
     params = yaml.safe_load(Path(args.params).read_text())
-    evaluate(params, Path(args.raw), Path(args.features), Path(args.models), Path(args.reports))
+    evaluate(params, Path(args.raw), Path(args.features), Path(args.models), Path(args.reports),
+             use_mlflow=not args.no_mlflow)
 
 
 if __name__ == "__main__":
