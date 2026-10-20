@@ -2,7 +2,7 @@
 
 IA/DATA pillar of the EPSI M2 workshop **RESILIENCE-ALPHA**: an ML anomaly detector that
 spots a brute force on the payment platform's login, and a local RAG step that annotates
-each detection, before the CYBER remediation engine blocks the attacker and restarts the
+each detection with a local LLM, before the CYBER remediation engine blocks the attacker and restarts the
 service, with no human action.
 
 > Status: work in progress (v0.1). Design docs are being updated to v0.4 and will be
@@ -17,7 +17,7 @@ login_attempts (DEV, Postgres)  ──►  detector service  ──►  POST /re
                                        ├─ every 5 s: features per source IP
                                        ├─ Isolation Forest score (0..1)
                                        ├─ decision: 2 ticks, cooldown, cap, protected IPs
-                                       ├─ RAG (Ollama, timeout + ML fallback)
+                                       ├─ RAG: LangChain + Mistral 7B on Ollama (timeout + ML fallback)
                                        └─ /metrics, /healthz, /readyz on :9108
 ```
 
@@ -29,8 +29,14 @@ login_attempts (DEV, Postgres)  ──►  detector service  ──►  POST /re
   does not need to know the attack in advance. Score mapped to 0..1.
 - **Decision**: score above threshold on 2 consecutive ticks; cooldown 300 s per IP;
   global cap; protected-IP list.
-- **RAG in the loop**: the LLM may confirm or narrow the ML action. On timeout or an
-  invalid answer, the ML action is sent anyway. The LLM never produces commands.
+- **Tracked in MLflow**: every training run logs its parameters, metrics and model files;
+  the model is registered as `auth_bruteforce` and gets the `production` alias only when
+  the evaluation gate passes (detected, delay ≤ 15 s, no false positive).
+- **RAG in the loop**: LangChain retrieves the relevant runbook passages (`runbooks/`) and
+  asks **Mistral 7B** (7.3B parameters, under the 8B limit) on the cluster's Ollama to
+  confirm one action (`block_ip` or `restart_service`) and explain it, as strict JSON at
+  temperature 0. On timeout (9 s), invalid JSON or a forbidden action, the ML action is
+  sent anyway. The LLM never produces commands.
 
 ## Anomaly event (sent to `POST /remediate`)
 
@@ -69,7 +75,8 @@ make setup      # venv + dependencies
 make data       # synthetic datasets (normal, brute force, hard)
 make features   # labelled feature tables
 make train      # train the Isolation Forest
-make evaluate   # detection delay, false positives, gate -> reports/
+make evaluate   # detection delay, false positives, gate -> reports/ + MLflow
+make mlflow-ui  # browse runs and the model registry on http://127.0.0.1:5000
 make test       # unit + end-to-end tests
 make replay     # replay the brute-force capture through the service
 ```
@@ -81,9 +88,11 @@ Runtime configuration is environment variables; see `.env.example`.
 ```
 src/detector/     service: schema, features, scorer, decision, sources, sinks, metrics, RAG
 src/generator/    synthetic login_attempts data with labels
-src/training/     build_features, train, evaluate
+src/training/     build_features, train (MLflow), evaluate (MLflow + promotion)
+runbooks/         remediation runbooks indexed by the RAG step
 tests/            unit tests and an end-to-end pipeline test
 params.yaml       generator, feature and model parameters
 ```
 
-`data/`, `models/` and `events/` are generated locally and never committed.
+`data/`, `models/`, `events/` and the MLflow store (`mlflow.db`, `mlruns/`) are generated
+locally and never committed.
