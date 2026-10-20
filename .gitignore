@@ -20,11 +20,11 @@ build/
 dist/
 
 # Data, models, events, reports artifacts (local only)
-data/
-models/
-events/
-mlruns/
-mlartifacts/
+/data/
+/models/
+/events/
+/mlruns/
+/mlartifacts/
 mlflow.db
 *.gguf
 *.bin
