@@ -1,0 +1,28 @@
+# Parameters for the generator, features and model (training time).
+# Runtime config of the service is environment variables (see docs/interface-contract.md §7).
+
+generator:
+  duration_min: 60
+  users: 200
+  normal_rate_per_min: 30
+  normal_fail_ratio: 0.08
+  retry_burst_prob: 0.02
+  attack_start_min: 40
+  attack_duration_s: 120
+  attack_rate_per_s: 5
+  attacker_ips: 1
+  attack_user_mode: spray   # spray | single
+
+features:
+  tick_s: 5
+  windows_s: [10, 60]
+  history_s: 300
+
+model:
+  detector: auth_bruteforce
+  version: "0.1.0"
+  n_estimators: 200
+  max_samples: 256
+  contamination: auto
+  random_state: 42
+  threshold: 0.90

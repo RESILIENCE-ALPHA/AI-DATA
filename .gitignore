@@ -1,0 +1,33 @@
+# Assistant / local notes — never pushed (public repo)
+CLAUDE.md
+AGENTS.md
+HANDOFF.md
+.claude/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.env
+*.env
+!.env.example
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+
+# Data, models, events, reports artifacts (local only)
+data/
+models/
+events/
+*.gguf
+*.bin
+*.log
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

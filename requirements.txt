@@ -1,0 +1,9 @@
+# Pinned at first-digit for a 3-day build; lock later if time allows.
+numpy>=2.1,<3
+scikit-learn>=1.5,<2
+pydantic>=2.9,<3
+prometheus-client>=0.21,<1
+httpx>=0.27,<1
+PyYAML>=6.0,<7
+# Live Postgres source (optional, install with: uv pip install "psycopg[binary]")
+psycopg[binary]>=3.2,<4
