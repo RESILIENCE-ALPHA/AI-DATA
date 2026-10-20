@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+from bisect import bisect_right
 from pathlib import Path
 
 from detector.features import FEATURE_NAMES, compute_vectors
@@ -49,6 +50,7 @@ def build(dataset: str, raw_root: Path, out_root: Path) -> Path:
         raise SystemExit(f"no records in {raw_dir}/auth.jsonl (run the generator first)")
 
     start, end = records[0].ts, records[-1].ts
+    ts_list = [r.ts for r in records]  # sorted, for fast window slicing
     out_root.mkdir(parents=True, exist_ok=True)
     out_path = out_root / f"{dataset}.csv"
     n_rows = 0
@@ -57,7 +59,7 @@ def build(dataset: str, raw_root: Path, out_root: Path) -> Path:
         writer.writerow(["ts", "src_ip", "label", *FEATURE_NAMES])
         t = start + TICK_S
         while t <= end + TICK_S:
-            window = [r for r in records if t - 300 < r.ts <= t]
+            window = records[bisect_right(ts_list, t - 300) : bisect_right(ts_list, t)]
             for ip, vec in compute_vectors(window, t).items():
                 label = _label_for(ip, t, labels)
                 writer.writerow([f"{t:.3f}", ip, label, *[vec[name] for name in FEATURE_NAMES]])

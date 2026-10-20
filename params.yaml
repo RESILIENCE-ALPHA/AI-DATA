@@ -25,4 +25,5 @@ model:
   max_samples: 256
   contamination: auto
   random_state: 42
-  threshold: 0.90
+  threshold: 0.90          # in the rescaled 0..1 score; raw_thr maps to this value
+  threshold_margin: 0.03   # raw-score margin above the most anomalous normal vector

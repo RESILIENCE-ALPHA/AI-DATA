@@ -8,6 +8,8 @@ without it.
 
 from __future__ import annotations
 
+from datetime import UTC
+
 from ..schema import Record, record_from_login_attempt
 
 _QUERY = """
@@ -31,9 +33,9 @@ class PostgresSource:
         self._seen_ids: set[str] = set()
 
     def _fetch(self, since_epoch: float) -> list[Record]:
-        from datetime import datetime, timezone
+        from datetime import datetime
 
-        since = datetime.fromtimestamp(since_epoch, tz=timezone.utc)
+        since = datetime.fromtimestamp(since_epoch, tz=UTC)
         out: list[Record] = []
         with self._psycopg.connect(self._dsn) as conn, conn.cursor() as cur:
             cur.execute(_QUERY, {"since": since, "limit": self._limit})

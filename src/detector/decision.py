@@ -14,7 +14,7 @@ import ipaddress
 import uuid
 from collections import deque
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from .schema import AnomalyEvent, Evidence
 
@@ -111,7 +111,7 @@ class Engine:
         )
         event = AnomalyEvent(
             event_id=str(uuid.uuid4()),
-            ts=datetime.fromtimestamp(now, tz=timezone.utc).isoformat().replace("+00:00", "Z"),
+            ts=datetime.fromtimestamp(now, tz=UTC).isoformat().replace("+00:00", "Z"),
             detector=self.detector,
             model_version=self.model_version,
             severity=severity,

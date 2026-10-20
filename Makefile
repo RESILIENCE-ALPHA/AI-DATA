@@ -3,6 +3,8 @@
 VENV ?= .venv
 PY := $(VENV)/bin/python
 PIP := uv pip
+# Works even if the editable install's .pth is ignored (macOS hidden-file flag).
+export PYTHONPATH := src
 
 setup:
 	uv venv $(VENV)

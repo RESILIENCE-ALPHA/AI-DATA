@@ -16,7 +16,7 @@ from __future__ import annotations
 import argparse
 import json
 import random
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 LEGIT_UAS = [
@@ -36,7 +36,7 @@ PRESETS = {
 
 
 def _iso(dt: datetime) -> str:
-    return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    return dt.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _public_ip(rng: random.Random) -> str:
@@ -54,7 +54,7 @@ def generate(preset: str, out_root: Path) -> Path:
     office_ip = _public_ip(rng)  # shared NAT: many users, normal fail rate
     bot_ips = [_public_ip(rng) for _ in range(6)]
 
-    start = datetime.now(timezone.utc) - timedelta(minutes=duration_min)
+    start = datetime.now(UTC) - timedelta(minutes=duration_min)
     rows: list[dict] = []
 
     def add(ts: datetime, ip: str, email: str, ok: bool, ua: str, known: bool = True) -> None:

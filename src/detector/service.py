@@ -102,11 +102,15 @@ class Service:
         if not records:
             log.warning("no records to replay")
             return
-        self.buffer.add_many(records)
         start, end = records[0].ts, records[-1].ts
         metrics.set_ready(True)
+        i = 0
         t = start + self.config.tick_s
         while t <= end + self.config.tick_s:
+            # Feed only records that have "arrived" by tick time t, like live mode.
+            while i < len(records) and records[i].ts <= t:
+                self.buffer.add(records[i])
+                i += 1
             self.score_tick(t)
             t += self.config.tick_s
         log.info("replay finished: %d records, %.0f s", len(records), end - start)
