@@ -1,0 +1,33 @@
+{
+  "detector": "auth_bruteforce",
+  "version": "0.1.0",
+  "datasets": {
+    "synth_bf_v1": {
+      "events_total": 1,
+      "events_on_attacker": 1,
+      "detection_delay_s_replay": 11.3,
+      "false_positive_events": 0,
+      "false_positive_ips": [],
+      "bot_events": 0,
+      "capture_hours": 1.0
+    },
+    "synth_hard_v1": {
+      "events_total": 0,
+      "events_on_attacker": 0,
+      "detection_delay_s_replay": null,
+      "false_positive_events": 0,
+      "false_positive_ips": [],
+      "bot_events": 0,
+      "capture_hours": 1.0
+    }
+  },
+  "bruteforce_detected": true,
+  "max_detection_delay_s_replay": 11.3,
+  "false_positive_events": 0,
+  "fp_per_hour": 0.0,
+  "gate": {
+    "max_delay_s": 15,
+    "max_false_positive_events": 0
+  },
+  "gate_pass": true
+}
