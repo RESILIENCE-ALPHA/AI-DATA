@@ -82,7 +82,7 @@ def test_rows_mapped_with_confirmed_target_user_rule():
     db = FakeDb([
         _row("1", now - 30, ip, "alice@epsi.fr", True, None, "u-alice"),
         _row("2", now - 20, ip, "alice@epsi.fr", False, bad, "u-alice"),
-        _row("3", now - 10, ip, "ghost@epsi.fr", False, bad, None),
+        _row("3", now - 10, ip, "ghost@epsi.fr", False, "USER_NOT_FOUND", None),
     ])
     recs = PostgresSource("dsn", connect=db.connect).backfill(now, 300)
     assert [r.reason for r in recs] == [None, "invalid_credentials", "unknown_user"]

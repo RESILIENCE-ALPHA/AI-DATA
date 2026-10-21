@@ -58,13 +58,19 @@ def generate(preset: str, out_root: Path) -> Path:
     rows: list[dict] = []
 
     def add(ts: datetime, ip: str, email: str, ok: bool, ua: str, known: bool = True) -> None:
+        # Same codes as DEV's auth service: unknown email -> USER_NOT_FOUND with no
+        # account id; wrong password on a real account -> INVALID_CREDENTIALS.
+        if ok:
+            reason = None
+        else:
+            reason = "INVALID_CREDENTIALS" if known else "USER_NOT_FOUND"
         rows.append(
             {
                 "createdAt": _iso(ts),
                 "ipAddress": ip,
                 "attemptedEmail": email,
                 "isAuthenticated": ok,
-                "failureReason": None if ok else "INVALID_CREDENTIALS",
+                "failureReason": reason,
                 "targetUserId": "u" if (ok or known) else None,
                 "userAgent": ua,
             }

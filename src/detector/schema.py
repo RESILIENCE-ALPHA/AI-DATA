@@ -43,6 +43,47 @@ def _parse_ts(value: object) -> float:
     return dt.timestamp()
 
 
+# failureReason values written by DEV's auth service (epsi_pay auth/src/service.ts),
+# mapped to the detector's reason names. The 5th wrong password is BRUTE_FORCE_LOCKED,
+# later attempts on a locked account are ACCOUNT_LOCKED (LOCKED_USER: old dictionary name).
+_REASONS = {
+    "USER_NOT_FOUND": "unknown_user",
+    "INVALID_CREDENTIALS": "invalid_credentials",
+    "BRUTE_FORCE_LOCKED": "account_locked",
+    "ACCOUNT_LOCKED": "account_locked",
+    "LOCKED_USER": "account_locked",
+    "IP_BLOCKED": "ip_blocked",
+}
+
+
+def normalize_ip(value: object) -> str:
+    """Trim the address and turn IPv4-mapped IPv6 (::ffff:1.2.3.4) into plain IPv4.
+
+    In-cluster callers can be recorded as ::ffff:10.42.x.y while the same host behind
+    the gateway is plain IPv4; one host must not be split into two keys.
+    """
+    ip = str(value or "").strip()
+    if ip.lower().startswith("::ffff:") and "." in ip:
+        ip = ip[7:]
+    return ip
+
+
+def _reason(is_auth: bool, raw_reason: object, target_user: object) -> str | None:
+    """Prefer the explicit failureReason; fall back to "no account" when it is missing.
+
+    IP_BLOCKED rows have targetUserId NULL even for real accounts (the IP check runs
+    before the user lookup), so a NULL targetUserId alone must not mean unknown user.
+    """
+    if is_auth:
+        return None
+    if raw_reason:
+        code = str(raw_reason).strip().upper()
+        return _REASONS.get(code, code.lower())
+    if target_user in (None, "", "null"):
+        return "unknown_user"
+    return None
+
+
 def record_from_login_attempt(row: dict) -> Record:
     """Map a `login_attempts` row (or a synthetic line in that shape) to a Record.
 
@@ -52,19 +93,11 @@ def record_from_login_attempt(row: dict) -> Record:
     ts = _parse_ts(row.get("createdAt") or row.get("ts"))
     is_auth = bool(row.get("isAuthenticated"))
     result = "success" if is_auth else "fail"
-
-    raw_reason = row.get("failureReason")
-    target_user = row.get("targetUserId")
-    if not is_auth and target_user in (None, "", "null"):
-        reason = "unknown_user"
-    elif raw_reason:
-        reason = str(raw_reason).lower()
-    else:
-        reason = None
+    reason = _reason(is_auth, row.get("failureReason"), row.get("targetUserId"))
 
     return Record(
         ts=ts,
-        src_ip=str(row.get("ipAddress") or row.get("src_ip") or ""),
+        src_ip=normalize_ip(row.get("ipAddress") or row.get("src_ip")),
         username=str(row.get("attemptedEmail") or row.get("username") or ""),
         result=result,
         reason=reason,
