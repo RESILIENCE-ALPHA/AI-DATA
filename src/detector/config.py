@@ -24,6 +24,7 @@ class Config:
     enabled_detectors: list[str] = field(default_factory=lambda: ["auth_bruteforce"])
     models_dir: str = "models"
     cooldown_s: float = 300.0
+    score_threshold: float = 0.0  # 0 = use the model's own threshold (metadata.json)
     event_rate_cap_per_min: int = 10
     protected_ips: list[str] = field(default_factory=list)
     metrics_port: int = 9108
@@ -64,6 +65,7 @@ class Config:
             enabled_detectors=_split(e.get("ENABLED_DETECTORS", "auth_bruteforce")),
             models_dir=e.get("MODELS_DIR", "models"),
             cooldown_s=float(e.get("COOLDOWN_S", "300")),
+            score_threshold=float(e.get("SCORE_THRESHOLD", "0") or 0),
             event_rate_cap_per_min=int(e.get("EVENT_RATE_CAP_PER_MIN", "10")),
             protected_ips=_split(e.get("PROTECTED_IPS", "")),
             metrics_port=int(e.get("METRICS_PORT", "9108")),

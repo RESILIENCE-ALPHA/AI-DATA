@@ -82,7 +82,7 @@ class Service:
             self.engines[name] = Engine(
                 detector=name,
                 model_version=scorer.model_version,
-                threshold=scorer.threshold,
+                threshold=self.config.score_threshold or scorer.threshold,
                 cooldown_s=self.config.cooldown_s,
                 event_cap_per_min=self.config.event_rate_cap_per_min,
                 protected_ips=self.config.protected_ips,

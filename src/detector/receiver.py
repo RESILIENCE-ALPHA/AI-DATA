@@ -61,8 +61,10 @@ class _Handler(BaseHTTPRequestHandler):
             return
         alert = parse_falco(payload if isinstance(payload, dict) else {})
         metrics.falco_alerts_total.labels(alert["priority"] or "none").inc()
-        log.info("falco alert rule=%r priority=%s pod=%s/%s",
-                 alert["rule"], alert["priority"], alert["namespace"], alert["pod"])
+        # Low-priority alerts are counted but logged at debug: they can arrive by thousands.
+        level = logging.INFO if alert["priority"] in ACTIONABLE else logging.DEBUG
+        log.log(level, "falco alert rule=%r priority=%s pod=%s/%s",
+                alert["rule"], alert["priority"], alert["namespace"], alert["pod"])
         acted = False
         if alert["priority"] in ACTIONABLE and alert["namespace"] == "applications":
             # Best-effort: restart the workload that owns the flagged pod.
