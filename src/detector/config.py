@@ -38,6 +38,18 @@ class Config:
     rag_docs_dir: str = "runbooks"
     rag_embed_model: str = "nomic-embed-text"
 
+    # Remediation executor (SINK=remediate). dry_run changes nothing on the cluster.
+    remediation_mode: str = "dry_run"  # "dry_run" | "apisix"
+    apisix_admin_url: str = "http://apisix-admin.apisix.svc.cluster.local:9180/apisix/admin"
+    apisix_admin_key: str = ""
+    apisix_global_rule_id: str = "ia-ipblock"
+    block_ttl_s: float = 900.0
+    restart_enabled: bool = False
+    kubectl_bin: str = "kubectl"
+    # Falco receiver (CYBER's Falcosidekick POSTs here).
+    receiver_enabled: bool = False
+    receiver_port: int = 5000
+
     @classmethod
     def from_env(cls) -> Config:
         e = os.environ
@@ -64,4 +76,16 @@ class Config:
             rag_timeout_s=float(e.get("RAG_TIMEOUT_S", "9")),
             rag_docs_dir=e.get("RAG_DOCS_DIR", "runbooks"),
             rag_embed_model=e.get("RAG_EMBED_MODEL", "nomic-embed-text"),
+            remediation_mode=e.get("REMEDIATION_MODE", "dry_run"),
+            apisix_admin_url=e.get(
+                "APISIX_ADMIN_URL",
+                "http://apisix-admin.apisix.svc.cluster.local:9180/apisix/admin",
+            ),
+            apisix_admin_key=e.get("APISIX_ADMIN_KEY", ""),
+            apisix_global_rule_id=e.get("APISIX_GLOBAL_RULE_ID", "ia-ipblock"),
+            block_ttl_s=float(e.get("BLOCK_TTL_S", "900")),
+            restart_enabled=e.get("RESTART_ENABLED", "").lower() in ("1", "true", "yes"),
+            kubectl_bin=e.get("KUBECTL_BIN", "kubectl"),
+            receiver_enabled=e.get("RECEIVER_ENABLED", "").lower() in ("1", "true", "yes"),
+            receiver_port=int(e.get("RECEIVER_PORT", "5000")),
         )

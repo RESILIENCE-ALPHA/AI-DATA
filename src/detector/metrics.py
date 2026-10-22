@@ -47,6 +47,31 @@ last_alert_timestamp = Gauge(
     ["detector"], registry=REGISTRY,
 )
 
+# Remediation executor (IA owns execution: block IP in APISIX, restart workload).
+remediation_blocks_total = Counter(
+    "detector_remediation_blocks_total", "IPs blocked in APISIX", registry=REGISTRY
+)
+remediation_unblocks_total = Counter(
+    "detector_remediation_unblocks_total", "IPs unblocked (TTL or clear)", registry=REGISTRY
+)
+remediation_restarts_total = Counter(
+    "detector_remediation_restarts_total", "Workload restarts performed", registry=REGISTRY
+)
+remediation_protected_skips_total = Counter(
+    "detector_remediation_protected_skips_total", "Blocks refused on protected/invalid IPs",
+    registry=REGISTRY,
+)
+remediation_errors_total = Counter(
+    "detector_remediation_errors_total", "APISIX or kubectl remediation errors", registry=REGISTRY
+)
+currently_blocked_ips = Gauge(
+    "detector_currently_blocked_ips", "IPs currently in the APISIX blacklist", registry=REGISTRY
+)
+falco_alerts_total = Counter(
+    "detector_falco_alerts_total", "Falco alerts received on /remediate", ["priority"],
+    registry=REGISTRY,
+)
+
 _READY = {"ready": False}
 
 

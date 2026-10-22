@@ -29,10 +29,35 @@ class Service:
         self.scorers: dict[str, Scorer] = {}
         self.engines: dict[str, Engine] = {}
         self.buffer = RollingBuffer()
+        self.executor = self._build_executor()
         self.sink = self._build_sink()
         self.rag = self._build_rag()
 
+    def _build_executor(self):
+        if self.config.sink != "remediate" and not self.config.receiver_enabled:
+            return None
+        from .executor import ApisixBlocker, RemediationExecutor
+
+        blocker = None
+        if self.config.remediation_mode == "apisix" and self.config.apisix_admin_key:
+            blocker = ApisixBlocker(
+                self.config.apisix_admin_url, self.config.apisix_admin_key,
+                self.config.apisix_global_rule_id,
+            )
+        return RemediationExecutor(
+            protected_ips=self.config.protected_ips,
+            block_ttl_s=self.config.block_ttl_s,
+            mode=self.config.remediation_mode,
+            blocker=blocker,
+            restart_enabled=self.config.restart_enabled,
+            kubectl_bin=self.config.kubectl_bin,
+        )
+
     def _build_sink(self):
+        if self.config.sink == "remediate" and self.executor is not None:
+            from .sinks.executor_sink import ExecutorSink
+
+            return ExecutorSink(self.executor)
         if self.config.sink == "http" and self.config.remediation_url:
             from .sinks.http import HttpSink
 
@@ -69,6 +94,8 @@ class Service:
         from .features import compute_vectors
 
         self.buffer.prune(now)
+        if self.executor is not None:
+            self.executor.sweep(now)  # lift blocks whose TTL has passed
         records = self.buffer.records
         vectors = compute_vectors(records, now)
         for name, scorer in self.scorers.items():
@@ -157,8 +184,16 @@ class Service:
 
         return _Static()
 
+    def start_receiver(self) -> None:
+        """Start the Falco alert receiver (CYBER's Falcosidekick target), if enabled."""
+        if self.config.receiver_enabled and self.executor is not None:
+            from .receiver import start_receiver
+
+            start_receiver(self.config.receiver_port, self.executor)
+
     def run(self) -> None:
         self.load_models()
+        self.start_receiver()
         if self.config.replay:
             self.run_replay()
         else:
