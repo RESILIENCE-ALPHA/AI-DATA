@@ -53,6 +53,11 @@ def test_dev_reason_codes_mapped():
     assert record_from_login_attempt(_failed("ACCOUNT_LOCKED", "u1")).reason == "account_locked"
 
 
+def test_master_invalid_credentials_on_unknown_email_is_unknown_user():
+    # Deployed auth (epsi_pay master) writes INVALID_CREDENTIALS + NULL target for an unknown email.
+    assert record_from_login_attempt(_failed("INVALID_CREDENTIALS", None)).reason == "unknown_user"
+
+
 def test_ip_blocked_with_null_target_is_not_unknown_user():
     # DEV writes IP_BLOCKED rows without targetUserId, even for real accounts.
     assert record_from_login_attempt(_failed("IP_BLOCKED", None)).reason == "ip_blocked"

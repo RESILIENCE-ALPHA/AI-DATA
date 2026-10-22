@@ -73,11 +73,15 @@ def _reason(is_auth: bool, raw_reason: object, target_user: object) -> str | Non
 
     IP_BLOCKED rows have targetUserId NULL even for real accounts (the IP check runs
     before the user lookup), so a NULL targetUserId alone must not mean unknown user.
+    The deployed auth (epsi_pay master) writes INVALID_CREDENTIALS for an unknown email
+    too, with targetUserId NULL: that pair means unknown user.
     """
     if is_auth:
         return None
     if raw_reason:
         code = str(raw_reason).strip().upper()
+        if code == "INVALID_CREDENTIALS" and target_user in (None, "", "null"):
+            return "unknown_user"
         return _REASONS.get(code, code.lower())
     if target_user in (None, "", "null"):
         return "unknown_user"
