@@ -1,9 +1,10 @@
 # AI-DATA — RESILIENCE-ALPHA
 
 IA/DATA pillar of the EPSI M2 workshop **RESILIENCE-ALPHA**: an ML anomaly detector that
-spots a brute force on the payment platform's login, and a local RAG step that annotates
-each detection with a local LLM, before the CYBER remediation engine blocks the attacker and restarts the
-service, with no human action.
+spots a brute force on the payment platform's login, a local RAG step that annotates each
+detection with a local LLM, and a remediation executor that blocks the attacker's IP in
+APISIX, with no human action. The same service also receives CYBER's Falco runtime alerts
+on `/remediate`.
 
 > Status: work in progress (v0.1). Design docs are being updated to v0.4 and will be
 > added to `docs/` once they match the team decisions.
@@ -11,14 +12,15 @@ service, with no human action.
 ## How it works
 
 ```
-login_attempts (DEV, Postgres)  ──►  detector service  ──►  POST /remediate  ──►  CYBER engine
-   or synthetic JSON lines             │                     (anomaly event)        block IP,
-                                       │                                            restart auth
-                                       ├─ every 5 s: features per source IP
-                                       ├─ Isolation Forest score (0..1)
-                                       ├─ decision: 2 ticks, cooldown, cap, protected IPs
-                                       ├─ RAG: LangChain + Mistral 7B on Ollama (timeout + ML fallback)
-                                       └─ /metrics, /healthz, /readyz on :9108
+login_attempts (DEV, Postgres)  ──►  service-ia  ──►  block attacker IP in APISIX (TTL 15 min)
+   or synthetic JSON lines           │               (ip-restriction global rule, no human action)
+                                      ├─ every 5 s: features per source IP
+                                      ├─ Isolation Forest score (0..1)
+                                      ├─ decision: 2 ticks, cooldown, cap, protected IPs
+                                      ├─ RAG: LangChain + Mistral 7B on Ollama (timeout + ML fallback)
+                                      ├─ executor: block_ip (APISIX), restart_service (bonus)
+                                      ├─ /remediate on :5000  ◄── CYBER Falco / Falcosidekick
+                                      └─ /metrics, /healthz, /readyz on :9108
 ```
 
 - **Source**: DEV's `login_attempts` table (live, read-only user) or a JSON-lines file
@@ -38,7 +40,7 @@ login_attempts (DEV, Postgres)  ──►  detector service  ──►  POST /re
   temperature 0. On timeout (9 s), invalid JSON or a forbidden action, the ML action is
   sent anyway. The LLM never produces commands.
 
-## Anomaly event (sent to `POST /remediate`)
+## Anomaly event (logged to stdout/Loki, drives the executor)
 
 ```json
 {
@@ -86,7 +88,9 @@ Runtime configuration is environment variables; see `.env.example`.
 ## Layout
 
 ```
-src/detector/     service: schema, features, scorer, decision, sources, sinks, metrics, RAG
+src/detector/     service: schema, features, scorer, decision, sources, sinks, metrics, RAG,
+                  executor (APISIX block), receiver (Falco /remediate on :5000)
+deploy/           Dockerfile (repo root) + ia-service.yaml (service-ia in namespace ia)
 src/generator/    synthetic login_attempts data with labels
 src/training/     build_features, train (MLflow), evaluate (MLflow + promotion)
 runbooks/         remediation runbooks indexed by the RAG step

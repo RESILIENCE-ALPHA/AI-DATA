@@ -1,0 +1,128 @@
+# IA/DATA service for namespace `ia`: ML brute-force detector + APISIX block executor
+# + Falco receiver. CYBER's Falcosidekick posts to service-ia.ia.svc.cluster.local:5000/remediate.
+#
+# NEEDS FROM KARIM (two Vault paths, read by the ExternalSecrets below):
+#   1. apps/apisix-admin   field `key`  -> the APISIX admin key (already the source of truth
+#      in deploy_infra.sh). Lets us write the ip-restriction global rule.
+#   2. apps/detector-db-ro fields host, port, database, username, password -> a READ-ONLY
+#      Postgres user with SELECT on login_attempts only. Until it exists, point the
+#      ExternalSecret at apps/postgres-epsi-pay (the owner creds) as a stopgap.
+#
+# Deploy: build & push ghcr.io/resilience-alpha/service-ia:latest, then kubectl apply -f this.
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: apisix-admin
+  namespace: ia
+spec:
+  refreshInterval: "1h"
+  secretStoreRef: {name: vault-backend, kind: ClusterSecretStore}
+  target: {name: apisix-admin}
+  data:
+    - secretKey: key
+      remoteRef: {key: apisix-admin, property: key}      # Vault: apps/apisix-admin
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: detector-db
+  namespace: ia
+spec:
+  refreshInterval: "1h"
+  secretStoreRef: {name: vault-backend, kind: ClusterSecretStore}
+  target: {name: detector-db}
+  data:  # TODO Karim: switch the Vault key to apps/detector-db-ro once the read-only user exists
+    - {secretKey: host, remoteRef: {key: postgres-epsi-pay, property: host}}
+    - {secretKey: port, remoteRef: {key: postgres-epsi-pay, property: port}}
+    - {secretKey: database, remoteRef: {key: postgres-epsi-pay, property: database}}
+    - {secretKey: username, remoteRef: {key: postgres-epsi-pay, property: username}}
+    - {secretKey: password, remoteRef: {key: postgres-epsi-pay, property: password}}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: service-ia-config
+  namespace: ia
+data:
+  SOURCE: "postgres"
+  SINK: "remediate"
+  ENABLED_DETECTORS: "auth_bruteforce"
+  RECEIVER_ENABLED: "true"
+  RECEIVER_PORT: "5000"
+  REMEDIATION_MODE: "dry_run"       # flip to "apisix" when the admin key is confirmed
+  BLOCK_TTL_S: "900"
+  RESTART_ENABLED: "false"          # block_ip only for now; restart is a bonus path
+  RAG_ENABLED: "false"              # flip to "true" once mistral:7b + nomic-embed-text are pulled
+  OLLAMA_URL: "http://ollama.ia.svc.cluster.local:11434"
+  PROTECTED_IPS: ""                 # set the demo laptop / jury / venue public IPs before the demo
+  METRICS_PORT: "9108"
+  LOG_LEVEL: "info"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: service-ia
+  namespace: ia
+  labels: {app: service-ia}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: service-ia}
+  template:
+    metadata:
+      labels: {app: service-ia}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9108"
+        prometheus.io/path: "/metrics"
+    spec:
+      imagePullSecrets:
+        - name: ghcr-credentials      # same GHCR secret pattern as the app pods
+      containers:
+        - name: service-ia
+          image: ghcr.io/resilience-alpha/service-ia:latest
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef: {name: service-ia-config}
+          env:
+            - name: APISIX_ADMIN_KEY
+              valueFrom: {secretKeyRef: {name: apisix-admin, key: key}}
+            - name: DB_HOST
+              valueFrom: {secretKeyRef: {name: detector-db, key: host}}
+            - name: DB_PORT
+              valueFrom: {secretKeyRef: {name: detector-db, key: port}}
+            - name: DB_NAME
+              valueFrom: {secretKeyRef: {name: detector-db, key: database}}
+            - name: DB_USER
+              valueFrom: {secretKeyRef: {name: detector-db, key: username}}
+            - name: DB_PASSWORD
+              valueFrom: {secretKeyRef: {name: detector-db, key: password}}
+            - name: PG_DSN
+              value: postgresql://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)
+          ports:
+            - {name: receiver, containerPort: 5000}
+            - {name: metrics, containerPort: 9108}
+          readinessProbe:
+            httpGet: {path: /readyz, port: 9108}
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /healthz, port: 9108}
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          resources:
+            requests: {cpu: "250m", memory: "512Mi"}
+            limits: {cpu: "1", memory: "1Gi"}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-ia
+  namespace: ia
+spec:
+  type: ClusterIP
+  selector: {app: service-ia}
+  ports:
+    - {name: receiver, port: 5000, targetPort: 5000}   # Falcosidekick -> /remediate
+    - {name: metrics, port: 9108, targetPort: 9108}
