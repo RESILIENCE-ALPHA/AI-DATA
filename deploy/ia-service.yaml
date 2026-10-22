@@ -82,7 +82,9 @@ data:
   RESTART_ENABLED: "false"          # block_ip only for now; restart is a bonus path
   RAG_ENABLED: "false"              # flip to "true" once mistral:7b + nomic-embed-text are pulled
   OLLAMA_URL: "http://ollama.ia.svc.cluster.local:11434"
-  PROTECTED_IPS: ""                 # set the demo laptop / jury / venue public IPs before the demo
+  # Never blocked: loopback, k3s pod and service networks. Add the device that makes the
+  # final "proof" payment at deploy time (never the attacking laptop).
+  PROTECTED_IPS: "127.0.0.0/8,10.42.0.0/16,10.43.0.0/16"
   METRICS_PORT: "9108"
   LOG_LEVEL: "info"
 ---
