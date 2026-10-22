@@ -1,12 +1,11 @@
 # IA/DATA service for namespace `ia`: ML brute-force detector + APISIX block executor
 # + Falco receiver. CYBER's Falcosidekick posts to service-ia.ia.svc.cluster.local:5000/remediate.
 #
-# NEEDS FROM KARIM (two Vault paths, read by the ExternalSecrets below):
-#   1. apps/apisix-admin   field `key`  -> the APISIX admin key (already the source of truth
-#      in deploy_infra.sh). Lets us write the ip-restriction global rule.
-#   2. apps/detector-db-ro fields host, port, database, username, password -> a READ-ONLY
-#      Postgres user with SELECT on login_attempts only. Until it exists, point the
-#      ExternalSecret at apps/postgres-epsi-pay (the owner creds) as a stopgap.
+# Vault paths read by the ExternalSecrets below (field names checked in Vault, 22 Oct):
+#   apps/apisix-admin       key                                   -> APISIX admin key
+#   apps/postgres-epsi-pay  host, port, database, username, password -> DB (owner creds for
+#                           now; switch to a read-only user apps/detector-db-ro when it exists)
+#   apps/ghcr-credentials   username, token                       -> image pull secret
 #
 # Deploy: build & push ghcr.io/resilience-alpha/service-ia:latest, then kubectl apply -f this.
 ---
@@ -38,6 +37,34 @@ spec:
     - {secretKey: database, remoteRef: {key: postgres-epsi-pay, property: database}}
     - {secretKey: username, remoteRef: {key: postgres-epsi-pay, property: username}}
     - {secretKey: password, remoteRef: {key: postgres-epsi-pay, property: password}}
+---
+# Same pull secret as infra/kubernetes/security/ghcr-auth.yaml, for namespace ia.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: ghcr-credentials
+  namespace: ia
+spec:
+  refreshInterval: "1h"
+  secretStoreRef: {name: vault-backend, kind: ClusterSecretStore}
+  target:
+    name: ghcr-credentials
+    template:
+      type: kubernetes.io/dockerconfigjson
+      data:
+        .dockerconfigjson: |
+          {
+            "auths": {
+              "https://ghcr.io": {
+                "username": "{{ .username }}",
+                "password": "{{ .token }}",
+                "auth": "{{ printf "%s:%s" .username .token | b64enc }}"
+              }
+            }
+          }
+  data:
+    - {secretKey: username, remoteRef: {key: ghcr-credentials, property: username}}
+    - {secretKey: token, remoteRef: {key: ghcr-credentials, property: token}}
 ---
 apiVersion: v1
 kind: ConfigMap
