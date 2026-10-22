@@ -77,10 +77,12 @@ data:
   ENABLED_DETECTORS: "auth_bruteforce"
   RECEIVER_ENABLED: "true"
   RECEIVER_PORT: "5000"
-  REMEDIATION_MODE: "dry_run"       # flip to "apisix" when the admin key is confirmed
+  REMEDIATION_MODE: "apisix"        # "dry_run" logs the block without touching APISIX
   BLOCK_TTL_S: "900"
-  RESTART_ENABLED: "false"          # block_ip only for now; restart is a bonus path
-  RAG_ENABLED: "false"              # flip to "true" once mistral:7b + nomic-embed-text are pulled
+  RESTART_ENABLED: "false"          # block_ip only; restart_service is a bonus path
+  RAG_ENABLED: "true"               # needs qwen2.5:1.5b + nomic-embed-text pulled in Ollama
+  RAG_MODEL: "qwen2.5:1.5b"
+  RAG_TIMEOUT_S: "12"
   OLLAMA_URL: "http://ollama.ia.svc.cluster.local:11434"
   # Never blocked: loopback, k3s pod and service networks. Add the device that makes the
   # final "proof" payment at deploy time (never the attacking laptop).

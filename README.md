@@ -17,7 +17,7 @@ login_attempts (DEV, Postgres)  ──►  service-ia  ──►  block attacker
                                       ├─ every 5 s: features per source IP
                                       ├─ Isolation Forest score (0..1)
                                       ├─ decision: 2 ticks, cooldown, cap, protected IPs
-                                      ├─ RAG: LangChain + Mistral 7B on Ollama (timeout + ML fallback)
+                                      ├─ RAG: LangChain + qwen2.5:1.5b on Ollama (timeout + ML fallback)
                                       ├─ executor: block_ip (APISIX), restart_service (bonus)
                                       ├─ /remediate on :5000  ◄── CYBER Falco / Falcosidekick
                                       └─ /metrics, /healthz, /readyz on :9108
@@ -35,10 +35,14 @@ login_attempts (DEV, Postgres)  ──►  service-ia  ──►  block attacker
   the model is registered as `auth_bruteforce` and gets the `production` alias only when
   the evaluation gate passes (detected, delay ≤ 15 s, no false positive).
 - **RAG in the loop**: LangChain retrieves the relevant runbook passages (`runbooks/`) and
-  asks **Mistral 7B** (7.3B parameters, under the 8B limit) on the cluster's Ollama to
+  asks **qwen2.5:1.5b** (1.5B parameters, under the 8B limit) on the cluster's Ollama to
   confirm one action (`block_ip` or `restart_service`) and explain it, as strict JSON at
-  temperature 0. On timeout (9 s), invalid JSON or a forbidden action, the ML action is
+  temperature 0. On timeout (12 s), invalid JSON or a forbidden action, the ML action is
   sent anyway. The LLM never produces commands.
+- **Why qwen2.5:1.5b**: the VPS runs the LLM on CPU. Measured on our exact RAG prompt,
+  Mistral 7B did not fit in the available memory and llama3.2:3b always exceeded the
+  timeout; qwen2.5:1.5b answers in 6–7 s with 1.6 GB of RAM. The code default
+  (`RAG_MODEL`) is overridden by the deployment (`deploy/ia-service.yaml`).
 
 ## Anomaly event (logged to stdout/Loki, drives the executor)
 
